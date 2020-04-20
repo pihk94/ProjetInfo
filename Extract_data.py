@@ -12,11 +12,29 @@ class Portfeuille:
         self.num_symbols = len(symbols)
         self.start = start
         self.end = end
+        #Chargement des données et on fait en sorte qu'on soit sure qu'on ast le même format pour tous
         for symbol in self.symbols:
             if not os.path.exists("Data/"+symbol+".csv"):
                 self.extract_hist_curr(symbol,"30m",10000,datetime.datetime(2014,1,1),datetime.datetime.now(),-1,False)
             else:
+                print(f"Présence des données historiques pour {symbol}")
                 self.make_format("Data/"+symbol+".csv")
+        #On collecte chaque features dans un seul dataframe 
+        self.df_close = self.extract_column(self.symbols,self.start,self.end,label ="close")
+        self.df_high = self.extract_column(self.symbols,self.start,self.end,label ="high")
+        self.df_low = self.extract_column(self.symbols,self.start,self.end,label ="low")
+        self.df_open = self.extract_column(self.symbols,self.start,self.end,label ="open")
+        self.df_volume = self.extract_column(self.symbols,self.start,self.end,label ="volume")
+    def extract_column(self,symbols,end,start,label):
+        full_df = pd.DataFrame()
+        for symbol in symbols:
+            df = pd.read_csv("Data/"+symbol+".csv")
+            df = pd.DataFrame(df[label].values,columns=[symbol])
+            if full_df.empty:
+                full_df = df
+            else:
+                full_df = full_df.join(df, how='outer')
+        return full_df
     def extract_hist_curr(self,symbol,interval,limit,start,end,sort,verbose=True):
         """ Description :
         INPUTS :
@@ -64,9 +82,8 @@ class Portfeuille:
         dt_range = pd.date_range(start=datetime.datetime(2017,8,1,0,0),end=datetime.datetime(2020,4,10,0,0),freq='30min')
         dt_range = pd.DataFrame(dt_range,columns=["time"])
         df = pd.merge(dt_range,df,how="left",on="time")
-        df = test.fillna(method="ffill")
-        print(len(df))
-        df.to_csv(filename)
+        df = df.fillna(method="ffill")
+        df[['time','open','close','high','low','volume']].to_csv(filename,index=False)
 #SYMBOLS = ['BTCUSD','ETHUSD','XRPUSD','EOSUSD','LTCUSD','BCHUSD','ZECUSD','ETCUSD','NEOUSD','XMRUSD']
-SYMBOLS = ['BTCUSD','ETHBTC','XRPBTC','EOSBTC','LTCBTC','TRXBTC','ZECBTC','ETCBTC','NEOBTC','XMRBTC']
+SYMBOLS = ['BTCUSD','ETHBTC','XRPBTC','EOSBTC','LTCBTC','ZECBTC','ETCBTC','XMRBTC']
 Portfeuille(SYMBOLS,None,None)
