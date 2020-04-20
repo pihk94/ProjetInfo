@@ -12,6 +12,9 @@ class Portfeuille:
         self.num_symbols = len(symbols)
         self.start = start
         self.end = end
+        self.weights = []
+        self.returns = []
+        
         #Chargement des données et on fait en sorte qu'on soit sure qu'on ast le même format pour tous
         for symbol in self.symbols:
             if not os.path.exists("Data/"+symbol+".csv"):
@@ -19,7 +22,7 @@ class Portfeuille:
             else:
                 print(f"Présence des données historiques pour {symbol}")
                 self.make_format("Data/"+symbol+".csv")
-        #On collecte chaque features dans un seul dataframe 
+        #On collecte chaque features dans un seul dataframe
         self.df_close = self.extract_column(self.symbols,self.start,self.end,label ="close")
         self.df_high = self.extract_column(self.symbols,self.start,self.end,label ="high")
         self.df_low = self.extract_column(self.symbols,self.start,self.end,label ="low")
