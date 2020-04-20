@@ -8,13 +8,24 @@ import os
 
 class Portfeuille:
     def __init__(self,symbols,start,end):
+        """
+            Input: 
+                symbols :  Indices (pairs) des cryptos
+                    type : liste
+                end : Date de fin
+                    type : datetime
+                start : Date de début
+                    type : datetime
+                label : Nom de la colonne doit être parmis la liste [close,high,low,open,volume]
+                    type : string
+        """
         self.symbols = symbols
         self.num_symbols = len(symbols)
         self.start = start
         self.end = end
         self.weights = []
         self.returns = []
-        
+        self.transition_factor = 0.002
         #Chargement des données et on fait en sorte qu'on soit sure qu'on ast le même format pour tous
         for symbol in self.symbols:
             if not os.path.exists("Data/"+symbol+".csv"):
@@ -29,9 +40,24 @@ class Portfeuille:
         self.df_open = self.extract_column(self.symbols,self.start,self.end,label ="open")
         self.df_volume = self.extract_column(self.symbols,self.start,self.end,label ="volume")
     def extract_column(self,symbols,end,start,label):
+        """
+            Input: 
+                symbols :  Indices (pairs) des cryptos
+                    type : liste
+                end : Date de fin
+                    type : datetime
+                start : Date de début
+                    type : datetime
+                label : Nom de la colonne doit être parmis la liste [close,high,low,open,volume]
+                    type : string
+            Output:
+                Dataframe contenant toutes les cryptos du portfolio entre deux dates selon une colonne
+        """
         full_df = pd.DataFrame()
         for symbol in symbols:
             df = pd.read_csv("Data/"+symbol+".csv")
+            df.time = pd.to_datetime(df.time)
+            df[(df.time <= end) & (df.time >= start)]
             df = pd.DataFrame(df[label].values,columns=[symbol])
             if full_df.empty:
                 full_df = df
@@ -87,6 +113,11 @@ class Portfeuille:
         df = pd.merge(dt_range,df,how="left",on="time")
         df = df.fillna(method="ffill")
         df[['time','open','close','high','low','volume']].to_csv(filename,index=False)
+    def clear(self):
+        self.weights = []
+        self.returns = []
+    def get_return(self, weights, last_weights, step):
+
 #SYMBOLS = ['BTCUSD','ETHUSD','XRPUSD','EOSUSD','LTCUSD','BCHUSD','ZECUSD','ETCUSD','NEOUSD','XMRUSD']
 SYMBOLS = ['BTCUSD','ETHBTC','XRPBTC','EOSBTC','LTCBTC','ZECBTC','ETCBTC','XMRBTC']
 Portfeuille(SYMBOLS,None,None)
