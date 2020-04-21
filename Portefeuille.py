@@ -24,14 +24,14 @@ class Portfeuille:
         self.start = start
         self.end = end
         self.weights = []
-        self.returns = []
+        self.returns = [1]
         self.transition_factor = 0.002
         #Chargement des données et on fait en sorte qu'on soit sure qu'on ast le même format pour tous
         for symbol in self.symbols:
             if not os.path.exists("Data/"+symbol+".csv"):
                 self.extract_hist_curr(symbol,"30m",10000,datetime.datetime(2014,1,1),datetime.datetime.now(),-1,False)
             else:
-                print(f"Présence des données historiques pour {symbol}")
+                #print(f"Présence des données historiques pour {symbol}")
                 self.make_format("Data/"+symbol+".csv")
         #On collecte chaque features dans un seul dataframe
         self.df_close = self.extract_column(self.symbols,self.start,self.end,label ="close")
@@ -39,7 +39,9 @@ class Portfeuille:
         self.df_low = self.extract_column(self.symbols,self.start,self.end,label ="low")
         self.df_open = self.extract_column(self.symbols,self.start,self.end,label ="open")
         self.df_volume = self.extract_column(self.symbols,self.start,self.end,label ="volume")
-    def extract_column(self,symbols,end,start,label):
+        self.df_normalized =(self.df_open.shift(-1) / self.df_open).fillna(1)
+        self.idx_depart = np.where(self.df_close.index == start)[0][0]
+    def extract_column(self,symbols,start,end,label):
         """
             Input: 
                 symbols :  Indices (pairs) des cryptos
@@ -57,8 +59,10 @@ class Portfeuille:
         for symbol in symbols:
             df = pd.read_csv("Data/"+symbol+".csv")
             df.time = pd.to_datetime(df.time)
-            df[(df.time <= end) & (df.time >= start)]
+            df = df[(df.time <= end) & (df.time >= start)]
+            idx = df.time.values
             df = pd.DataFrame(df[label].values,columns=[symbol])
+            df.set_index(idx,inplace=True)
             if full_df.empty:
                 full_df = df
             else:
@@ -77,9 +81,7 @@ class Portfeuille:
             data : DataFrame avec l'historique des valeurs
         """
         h_debut = datetime.datetime.now()
-        debut = start
         start = time.mktime(start.timetuple())*1000
-        ended = end
         end = time.mktime(end.timetuple())*1000
         data = []
         step = 1000*60*limit
@@ -87,8 +89,7 @@ class Portfeuille:
         while start < end:
             start +=step
             fin = start + step
-            r = requests.get('https://api.bitfinex.com/v2/candles/trade:{}:t{}/hist?limit={}&start={}&end={}&sort=-1'.
-                                    format(interval, symbol.upper(), limit, start, fin, sort)).json()
+            r = requests.get(f'https://api.bitfinex.com/v2/candles/trade:{interval}:t{symbol.upper()}/hist?limit={limit}&start={start}&end={end}&sort={sort}').json()
             data.extend(r)
             if verbose == True:
                 print('Extraction des données de la période {} à {} pour {}. Taille de la requete {}'.format(pd.to_datetime(start,unit='ms'),pd.to_datetime(fin,unit='ms'),symbol,len(r)))
@@ -102,7 +103,7 @@ class Portfeuille:
         df.sort_index(inplace=True)
         df.index = pd.to_datetime(df.index, unit='ms')
         df.to_csv('Data/{}.csv'.format(symbol))
-        print('Travail terminé, fichier enregistré : {}\{}.csv'.format(os.getcwd(),symbol))
+        print('Travail terminé, fichier enregistré : {}-{}.csv'.format(os.getcwd(),symbol))
         h_fin = datetime.datetime.now()
         print('Début : {} | Fin : {}.\nExécution {} minutes.'.format(h_debut,h_fin,-1*(time.mktime(h_debut.timetuple())-time.mktime(h_fin.timetuple()))/60))
     def make_format(self,filename):
@@ -114,10 +115,18 @@ class Portfeuille:
         df = df.fillna(method="ffill")
         df[['time','open','close','high','low','volume']].to_csv(filename,index=False)
     def clear(self):
+        """
+            RAZ des valeurs 
+        """
         self.weights = []
-        self.returns = []
-    def get_return(self, weights, last_weights, step):
-
+        self.returns = [1]
+    def get_return(self, weight, last_weight, step):
+        cout_transaction = 1 - self.transition_factor * np.sum(np.abs(weight[:-1] - last_weight))
+        futur_price = np.append(self.df_normalized.iloc[self.idx_depart + step].values, [1])
+        return_journalier = np.dot(futur_price,weight) * cout_transaction
+        self.returns.append(return_journalier)
+        self.weights.append(weight)
+        return return_journalier,futur_price
 #SYMBOLS = ['BTCUSD','ETHUSD','XRPUSD','EOSUSD','LTCUSD','BCHUSD','ZECUSD','ETCUSD','NEOUSD','XMRUSD']
-SYMBOLS = ['BTCUSD','ETHBTC','XRPBTC','EOSBTC','LTCBTC','ZECBTC','ETCBTC','XMRBTC']
-Portfeuille(SYMBOLS,None,None)
+# SYMBOLS = ['BTCUSD','ETHBTC','XRPBTC','EOSBTC','LTCBTC','ZECBTC','ETCBTC','XMRBTC']
+# Portfeuille(SYMBOLS,datetime.datetime(2017,8,1),datetime.datetime(2020,4,1))
