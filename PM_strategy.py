@@ -37,7 +37,7 @@ def BHP(df,stat,end):
             liste des rendements de la stratégie
 
         Stratégie : Basé sur https://www.cs.princeton.edu/courses/archive/spring08/cos511/scribe_notes/0428.pdf
-            A chaque début de journée, on achete et on revend à la fin de la période.
+            A chaque début de journée, on achete et on revend à la fin.
     """
     poids = np.full(len(df.columns),1/len(df.columns))
     returns = []
@@ -48,4 +48,4 @@ def BHP(df,stat,end):
         returns.append(rendement)
         poids = poids *df.iloc[i].values
         poids = poids/sum(poids)
-    return returns,poids
+    return returns
