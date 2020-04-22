@@ -22,7 +22,7 @@ class Buffer:
         if self.total_experiences <= BATCH_SIZE:
             return self.buffer, self.total_experiences
         else:
-            random_batch = self.echantillon(self.total_experiences, self.SAMPLE_BIAIS)
+            random_batch = self.echantillon(self.total_experiences-BATCH_SIZE, self.SAMPLE_BIAIS)
             return self.buffer[random_batch : random_batch + BATCH_SIZE], BATCH_SIZE
     def add(self, state, futur_price, last_action):
         exp = (state,futur_price,last_action)

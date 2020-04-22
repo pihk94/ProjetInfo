@@ -1,7 +1,6 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input,Convolution2D,Reshape,concatenate,multiply,Flatten
+from tensorflow.keras.layers import Input,Convolution2D,Reshape,concatenate,multiply,Flatten,Activation
 from tensorflow.keras import regularizers
-from tensorflow.keras.layers.core import Activation
 from tensorflow.keras.models import Model
 class Agent:
     def __init__(self,session,state_size,action_size,BATCH_SIZE,LR,reward,NN):
@@ -12,10 +11,11 @@ class Agent:
         self.BATCH_SIZE = BATCH_SIZE
         self.DECAY_STEPS = 50000
         self.DECAY_RATE = 0.1
-        self.GLOBAL_STEP = tf.Variable(0, trainable=False)
-        self.LR = tf.compat.v1.train.exponential_decay(LR,self.GLOBAL_STEP,self.DECAY_STEPS,self.DECAY_RATE) # diminue le LR au cours du training, tous les 
+        self.GLOBAL_STEP = tf.Variable(0, trainable=False,name='global_step')
+        self.LR = tf.compat.v1.train.exponential_decay(LR,self.GLOBAL_STEP,self.DECAY_STEPS,self.DECAY_RATE, staircase=False) # diminue le LR au cours du training, tous les 
         self.TRANSITION_FACTOR = 0.002
         tf.compat.v1.keras.backend.set_session(self.sess)
+        self.futur_price = tf.compat.v1.placeholder(tf.float32,[None,state_size[0]+1])
         #Initialisation du model
         if NN == "CNN":
             print('Construction du CNN')
@@ -25,7 +25,6 @@ class Agent:
             self.reward = self.avg_log_cum_return()
         #On prend l'optimiser ADAM qui est le plus souvent utilisé dans la littérature et le plus efficace
         self.optimizer = tf.compat.v1.train.AdamOptimizer(LR).minimize(self.reward,global_step =self.GLOBAL_STEP)
-        self.futur_price = tf.compat.v1.placeholder(tf.float32,[None,state_size[0]+1])
         self.sess.run(tf.compat.v1.global_variables_initializer())
     def avg_log_cum_return(self):
         print("Reward : Rendements cumulés moyen logarithmique")
@@ -85,7 +84,7 @@ class Agent:
         #Préparation de l'output,i.e nos actions. On utilise la fonction softmax comme activation
         action = Activation('softmax')(F1)
         model = Model(inputs=[State,last_action,cash_bias],outputs=action)
-        return model, model.trainable_weights, State, last_action,cash_bias,vote
+        return model, model.trainable_weights, State, last_action,cash_bias,[vote,F1]
     def train(self,states,last_actions,futur_prices,cash_bias):
         self.sess.run(self.optimizer,
         feed_dict={
