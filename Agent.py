@@ -19,7 +19,7 @@ class Agent:
         #Initialisation du model
         if NN == "CNN":
             print('Construction du CNN')
-            self.model,self.weights,self.state,self.last_action,self.cash_bias,self.prediction,self.test = self.CNN(state_size)
+            self.model,self.weights,self.state,self.last_action,self.cash_bias,self.test = self.CNN(state_size)
         #Choix de la fonction de récompense
         if reward == 'avg_log_cum_return':
             self.reward = self.avg_log_cum_return()
@@ -38,7 +38,6 @@ class Agent:
         Kernel2D_2 = (state_size[1] - Kernel2D_1[0]+1,1)
         Filter2D_2 = 20
         State = Input(shape=[state_size[2],state_size[1],state_size[0]])
-        prediction = Input(shape=[state_size[0]])
         last_action = Input(shape=[state_size[0]])
         last_action_1 = Reshape((1, 1, state_size[0]))(last_action)
         cash_bias = Input(shape=[1])
@@ -82,10 +81,16 @@ class Agent:
             bias_regularizer = regularizers.l2(1e-8),
         )(Concate)
         vote = Flatten()(Conv2D_3)#On rend l'output en une seule dimension
-        vote_p = multiply([vote,prediction])
-        F1 = concatenate([vote_p,cash_bias],axis=1)
+        F1 = concatenate([vote,cash_bias],axis=1)
         #Préparation de l'output,i.e nos actions. On utilise la fonction softmax comme activation
         action = Activation('softmax')(F1)
-        model = Model(inputs=[State,last_action,cash_bias,prediction],outputs=action)
-        return model, model.trainable_weights, State, last_action,cash_bias,prediction,vote
+        model = Model(inputs=[State,last_action,cash_bias],outputs=action)
+        return model, model.trainable_weights, State, last_action,cash_bias,vote
+    def train(self,states,last_actions,futur_prices,cash_bias):
+        self.sess.run(self.optimizer,
+        feed_dict={
+            self.state : states,
+            self.last_action : last_actions,
+            self.futur_price : futur_prices,
+            self.cash_bias : cash_bias})
         
