@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from Agent import Agent
 from Portefeuille import Portfeuille
@@ -17,7 +18,7 @@ class Portfolio_managment:
         #HYPER PARAMETERS
         self.BUFFER_SIZE = 200
         self.BATCH_SIZE = 10
-        self.SHOW_EVERY = 24*7*2
+        self.SHOW_EVERY = 24*7*2*4
         self.WINDOW_SIZE = 48 # Une journée
         self.CASH_BIAS = 0 # ???
         self.NB_FEATURES = 3
@@ -45,6 +46,7 @@ class Portfolio_managment:
         return sess
     def simulate(self,episode_depart,episode_fin):
         #Premiere boucle sur les épisodes
+        cum_return_all = []
         for episode in tqdm(range(episode_depart+1,episode_depart+episode_fin+1)):
             if not (self.mode == 'train' and episode !=episode_depart):
                 self.charger_poids(episode)
@@ -72,6 +74,8 @@ class Portfolio_managment:
             self.buffer.clear()
             self.episode_reward.append(cum_return)
             self.enregistrer_poids(episode,Port,cum_return)
+            cum_return_all.append(cum_return)
+        pd.DataFrame(cum_return_all,columns=['cum_return']).to_csv('Model/Resultat/cum_return.csv')
         return self.episode_reward
     def replay(self,state,step,futur_price,last_action):
         self.buffer.add(state[step],futur_price,last_action)
