@@ -2,6 +2,7 @@ import pandas as pd
 import requests
 import time
 import datetime
+from datetime import timedelta
 import numpy as np
 import os
 
@@ -40,7 +41,7 @@ class Portfeuille:
         self.df_open = self.extract_column(self.symbols,self.start,self.end,label ="open")
         self.df_volume = self.extract_column(self.symbols,self.start,self.end,label ="volume")
         self.df_normalized =(self.df_open.shift(-1) / self.df_open).fillna(1)
-        self.idx_depart = np.where(self.df_close.index == start)[0][0]
+        self.idx_depart = np.where(self.df_close.index == start+timedelta(minutes=60*24*7))[0][0]
     def extract_column(self,symbols,start,end,label):
         """
             Input: 

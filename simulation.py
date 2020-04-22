@@ -13,7 +13,7 @@ class Portfolio_managment:
         self.BUFFER_SIZE = 200
         self.BATCH_SIZE = 10
         self.SHOW_EVERY = 250
-        self.WINDOW_SIZE = 50
+        self.WINDOW_SIZE = 48 # Une journée
         self.CASH_BIAS = 0 # ???
         self.NB_FEATURES = 3
         self.SAMPLE_BIAS = 1.05 # ???
@@ -43,7 +43,7 @@ class Portfolio_managment:
         for episode in range(episode_depart+1,episode_depart+episode_fin+1):
             Port = Portfeuille(self.symbols,self.period_start,self.period_end)
             #Préparation des états
-            state = 
+            state = state(Port,self.WINDOW_SIZE)
             cum_return = 1
             #Deuxieme boucle sur toute la période
             for step in range(len(state)-2):
@@ -54,14 +54,15 @@ class Portfolio_managment:
                 action = self.agent.model.predict([state[step].reshape([1,self.state_dim[2],self.state_dim[1],self.state_dim[0]]),
                 last_action.reshape([1,self.state_dim[0]]),np.array([[self.CASH_BIAS]])])
                 rendement_jour, futur_price = Port.get_return(action[0],last_action,step)
-                self.replay(self.agent,self.buffer,self.BATCH_SIZE,state,step,futur_price,last_action)
+                self.replay(state,step,futur_price,last_action)
                 cum_return *= rendement_jour
                 self.total_step +=1
                 if step % self.SHOW_EVERY:
-                    print(f"Episode {ep}, pas {step}\nCumReturn {cum_return} à la date : {state[step]}")
+                    print(f"Episode {episode}, pas {step}\nCumReturn {cum_return} à la date : {state[step]}")
                     print(action[0])
             self.buffer.clear()
             self.episode_reward.append(cum_return)
+        return self.episode_reward
     def replay(self,state,step,futur_price,last_action):
         self.buffer.add(state[step],futur_price,last_action)
         for _ in range(self.ROLLING_STEPS):
@@ -72,3 +73,16 @@ class Portfolio_managment:
             cash_biass = np.array([[self.CASH_BIAS] for _ in range(current_batch_size)])
             if step > 10:
                 self.agent.train(states,last_actions,futur_prices,cash_biass)
+    def states(self,portefeuille,window_size):
+        state = []
+        df = np.array([portefeuille.df_close.values,portefeuille.df_high.values,portefeuille.df_low.values], dtype='float')
+        for j in range(portefeuille.idx_depart -1, len(df[0])):
+            temp = np.copy(df[:, j-window_size+1:j+1 , :])
+            for feature in range(df.shape[0]):
+                for k in range(portefeuille.num_symbols):
+                    if temp[feature,-1,k] == 0:
+                        temp[feature,:,k] /= temp[feature,-2,k]
+                    else:
+                        temp[feature,:,k] /= temp[feature,-1,k]
+            state.append(temp)
+        return state
