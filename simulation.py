@@ -49,6 +49,7 @@ class Portfolio_managment:
         #Premiere boucle sur les épisodes
         all_ = []
         self.nb_ep = episode_fin - episode_depart
+        root_path = f'Model/Model_{str(self.period_start)[:10]}_{str(self.period_end)[:10]}_nbep_{self.nb_ep}'
         for episode in tqdm(range(episode_depart+1,episode_depart+episode_fin+1)):
             if not (self.mode == 'train' and episode ==episode_depart+1):
                 self.charger_poids(episode)
@@ -83,7 +84,7 @@ class Portfolio_managment:
             self.episode_reward.append(cum_return)
             self.enregistrer_poids(episode,Port,cum_return)
             all_ += [(cum_return,SR,SR_BTC,MD,VOL)]
-        pd.DataFrame(all_,columns=['cum_return','SR','SR_BTC','MD','Vol']).to_csv('Model/Resultat/perf.csv')
+        pd.DataFrame(all_,columns=['cum_return','SR','SR_BTC','MD','Vol']).to_csv(f'{root_path}/Resultat/perf.csv')
         return self.episode_reward
     def replay(self,state,step,futur_price,last_action):
         self.buffer.add(state[step],futur_price,last_action)
@@ -136,7 +137,7 @@ class Portfolio_managment:
         filename = 'Portfolio_{}_{}_{}_{}_{}.pickle'.format(self.mode,str(Port.start)[:10],str(Port.end)[:10],'-'.join(Port.symbols), cum_return)
         with open("{}/Resultats/{}".format(root_path,filename),"wb") as outfile:
             pickle.dump(Port, outfile)
-            print("Sauvegardé sous {}".format(filename) )
+            print("Sauvegardé sous {}/Resultats/{}".format(root_path,filename) )
     #Mesure des performances
     def rendements_cumules(self,lst_rendements_jours):
         """

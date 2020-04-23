@@ -173,10 +173,11 @@ class Agent:
         )(Conv2D_1)
         L1 = Permute((3,2,1))(Conv2D_2)
         L2 = TimeDistributed(LSTM(units=Lstm,activation ='tanh',return_sequences = True),input_shape=[state_size[0],-1,Filter2D_2])(L1)
-        L3 = TimeDistributed(LSTM(units=1, activation='linear', return_sequences=False), input_shape=[state_size[0],-1,Lstm)(L2)
+        L3 = TimeDistributed(LSTM(units=1, activation='linear', return_sequences=False), input_shape=[state_size[0],-1,Lstm])(L2)
         vote = Flatten()(L3)
         F1 = concatenate([vote,cash_bias],axis=1)
         action = Activation('softmax')(F1)
+        model = Model(inputs=[State, last_action, cash_bias], outputs=action)
         return model, model.trainable_weights, State, last_action, cash_bias, vote
     def train(self,states,last_actions,futur_prices,cash_bias):
         self.sess.run(self.optimizer,
