@@ -20,6 +20,14 @@ class Agent:
         if NN == "CNN":
             print('Construction du CNN')
             self.model,self.weights,self.state,self.last_action,self.cash_bias,self.test = self.CNN(state_size)
+        elif NN == 'CNN_DENSE':
+            print(f'Construction du {NN}')
+            self.model,self.weights,self.state,self.last_action,self.cash_bias,self.test = self.CNN_DENSE(state_size)
+        elif NN == 'CNN_LSTM':
+            print(f'Construction du {NN}')
+            self.model,self.weights,self.state,self.last_action,self.cash_bias,self.test = self.CNN_LSTM(state_size)
+        else:
+            raise ValueError("Le réseau n'est pas implémenté")
         #Choix de la fonction de récompense
         if reward == 'avg_log_cum_return':
             self.reward = self.avg_log_cum_return()
@@ -92,10 +100,10 @@ class Agent:
         Filter2D_1 = 3 # Valeur souvent utilisé pour commencer
         Kernel2D_2 = (5,1)
         Filter2D_2 = 20
-        Dense = 100
+        DENSE = 100
         State = Input(shape=[state_size[2],state_size[1],state_size[0]])
         last_action = Input(shape=[state_size[0]])
-        last_action_1 = Reshape((1, 1, state_size[0]))(last_action)
+        last_action_1 = Reshape((state_size[0], 1))(last_action)
         cash_bias = Input(shape=[1])
         #Ajout des couches
         Conv2D_1 = Convolution2D(
@@ -126,8 +134,10 @@ class Agent:
         L1 = Permute((3,1,2))(Conv2D_2)
         L2 = Reshape((state_size[0], -1))(L1)
         L3 = concatenate([last_action_1, L2], axis=2)
-        L4 = TimeDistributed(Dense(Dense, activation='relu'), input_shape=[state_size[0],-1])(L3)
-        L5 = TimeDistributed(Dense(1, activation='linear'), input_shape=[state_size[0], Dense])(L4)
+        print(Conv2D_1,Conv2D_2)
+        print(state_size,L1,L2,last_action_1,L3)
+        L4 = TimeDistributed(Dense(DENSE, activation='relu'), input_shape=[state_size[0],-1])(L3)
+        L5 = TimeDistributed(Dense(1, activation='linear'), input_shape=[state_size[0], DENSE])(L4)
         vote = Flatten()(L5)
         F1 = concatenate([vote,cash_bias],axis=1)
         #Fonction d'activation de l'ouput final softmax
@@ -135,7 +145,7 @@ class Agent:
         model = Model(inputs=[State, last_action, cash_bias], outputs=action)
         return model, model.trainable_weights, State, last_action, cash_bias, F1
     def CNN_LSTM(self, state_size):
-        #On change juste la dernière couche comparé au CNN Dense
+        #On change juste la dernière couche
         #HYPERPARAMETRES
         Kernel2D_1 = (5,1)
         Filter2D_1 = 3 # Valeur souvent utilisé pour commencer
@@ -144,7 +154,6 @@ class Agent:
         Lstm = 10
         State = Input(shape=[state_size[2],state_size[1],state_size[0]])
         last_action = Input(shape=[state_size[0]])
-        last_action_1 = Reshape((1, 1, state_size[0]))(last_action)
         cash_bias = Input(shape=[1])
         #Ajout des couches
         Conv2D_1 = Convolution2D(

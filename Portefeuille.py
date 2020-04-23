@@ -10,6 +10,7 @@ import os
 class Portfeuille:
     def __init__(self,symbols,start,end,cash):
         """
+        Objet contenant différentes pandas dataframe des différentes cryptomonnaies
             Input: 
                 symbols :  Indices (pairs) des cryptos
                     type : liste
@@ -26,7 +27,7 @@ class Portfeuille:
         self.end = end
         self.weights = []
         self.returns = [1]
-        self.transition_factor = 0.002
+        self.transition_factor = 0.002 #COUT DE TRANSACTION de BITFINEX
         #Chargement des données et on fait en sorte qu'on soit sure qu'on ast le même format pour tous
         for symbol in self.symbols + [cash]:
             if not os.path.exists("Data/"+symbol+".csv"):
@@ -35,9 +36,9 @@ class Portfeuille:
             else:
                 #print(f"Présence des données historiques pour {symbol}")
                 self.make_format("Data/"+symbol+".csv")
-        self.cash = pd.read_csv('Data/'+cash+'.csv')
+        self.cash = pd.read_csv('Data/'+cash+'.csv') #Obtenion de la monnaie de référence pour calculer les rendements
         self.cash.time = pd.to_datetime(self.cash.time)
-        self.cash = self.cash[(self.cash.time <= end) & (self.cash.time >= start+timedelta(minutes=60*24*7)+timedelta(minutes=30))]
+        self.cash = self.cash[(self.cash.time <= end) & (self.cash.time >= start+timedelta(minutes=60*24*7*2)+timedelta(minutes=30))]
         self.cash = (self.cash.open.shift(-1)/self.cash.open).fillna(1)
         #On collecte chaque features dans un seul dataframe
         self.df_close = self.extract_column(self.symbols,self.start,self.end,label ="close")
@@ -46,7 +47,14 @@ class Portfeuille:
         self.df_open = self.extract_column(self.symbols,self.start,self.end,label ="open")
         self.df_volume = self.extract_column(self.symbols,self.start,self.end,label ="volume")
         self.df_normalized =(self.df_open.shift(-1) / self.df_open).fillna(1)
-        self.idx_depart = np.where(self.df_close.index == start+timedelta(minutes=60*24*7))[0][0]
+        self.idx_depart = np.where(self.df_close.index == start+timedelta(minutes=60*24*7*2))[0][0]
+        #Indicateurs
+        self.df_roc = (self.df_close / self.df_close.shift(1)).fillna(1)
+        self.df_macd = self.df_close.ewm(span=12,min_periods =0, adjust = True, ignore_na=False).mean() / self.df_close.ewm(span=26,min_periods=0,adjust=True,ignore_na=False).mean()
+        self.df_ma3j = self.df_close.rolling(window= 48*3,min_periods = 1,center = False).mean()
+        self.df_ma7j = self.df_close.rolling(window= 48*7,min_periods = 1,center = False).mean()
+        self.df_ema14j = self.df_close.ewm(span=14,min_periods = 0,adjust =True,ignore_na = False).mean()
+        #self.df_SR = self.SR(self.df_close,48*14)
     def extract_column(self,symbols,start,end,label):
         """
             Input: 
@@ -139,3 +147,11 @@ class Portfeuille:
         self.returns.append(return_journalier)
         self.weights.append(weight)
         return return_journalier,futur_price
+    def SR(self,pr,period):
+        pr = np.log((pr / pr.shift(1)).fillna(1))
+        sw = pr.rolling(window = period,min_periods = 1, center = False)
+        print(sw,sw.count(),sw.mean())
+        free_rate =self.cash.rolling(window = period,min_periods = 1, center = False).mean()
+        return np.sqrt(sw.count()) * (sw.mean() - free_rate) / sw.std()
+        
+        
