@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input,Convolution2D,Reshape,concatenate,multiply,Flatten,Activation
+from tensorflow.keras.layers import Input,Convolution2D,Reshape,concatenate,multiply,Flatten,Activation,Permute,Dense,TimeDistributed,LSTM
 from tensorflow.keras import regularizers
 from tensorflow.keras.models import Model
 class Agent:
@@ -85,6 +85,99 @@ class Agent:
         action = Activation('softmax')(F1)
         model = Model(inputs=[State,last_action,cash_bias],outputs=action)
         return model, model.trainable_weights, State, last_action,cash_bias,[vote,F1]
+    def CNN_DENSE(self, state_size):
+        #Reprise de l'architecture du CNN + ajout d'une couche dense de 100
+        #HYPERPARAMETRES
+        Kernel2D_1 = (5,1)
+        Filter2D_1 = 3 # Valeur souvent utilisé pour commencer
+        Kernel2D_2 = (5,1)
+        Filter2D_2 = 20
+        Dense = 100
+        State = Input(shape=[state_size[2],state_size[1],state_size[0]])
+        last_action = Input(shape=[state_size[0]])
+        last_action_1 = Reshape((1, 1, state_size[0]))(last_action)
+        cash_bias = Input(shape=[1])
+        #Ajout des couches
+        Conv2D_1 = Convolution2D(
+            batch_input_shape=(self.BATCH_SIZE, state_size[2], state_size[1], state_size[0]),  
+            filters=Filter2D_1,
+            kernel_size=Kernel2D_1,     
+            strides=1,
+            padding='valid',              
+            data_format='channels_first',     
+            kernel_regularizer= regularizers.l2(1e-8),
+            activity_regularizer=regularizers.l2(1e-8),
+            bias_regularizer = regularizers.l2(1e-8),
+            activation='relu'
+        )(State)
+        Conv2D_2 = Convolution2D(
+            batch_input_shape= (self.BATCH_SIZE, Filter2D_1, state_size[1]-Kernel2D_1[0]+1, state_size[0]),
+            filters=Filter2D_2,
+            kernel_size=Kernel2D_2,     
+            strides=1,
+            padding='valid',                   
+            data_format='channels_first',      
+            kernel_regularizer= regularizers.l2(1e-8),
+            activity_regularizer= regularizers.l2(1e-8),
+            bias_regularizer = regularizers.l2(1e-8),
+            activation='relu'
+        )(Conv2D_1)
+        #Troisieme couche dense
+        L1 = Permute((3,1,2))(Conv2D_2)
+        L2 = Reshape((state_size[0], -1))(L1)
+        L3 = concatenate([last_action_1, L2], axis=2)
+        L4 = TimeDistributed(Dense(Dense, activation='relu'), input_shape=[state_size[0],-1])(L3)
+        L5 = TimeDistributed(Dense(1, activation='linear'), input_shape=[state_size[0], Dense])(L4)
+        vote = Flatten()(L5)
+        F1 = concatenate([vote,cash_bias],axis=1)
+        #Fonction d'activation de l'ouput final softmax
+        action = Activation('softmax')(F1)
+        model = Model(inputs=[State, last_action, cash_bias], outputs=action)
+        return model, model.trainable_weights, State, last_action, cash_bias, F1
+    def CNN_LSTM(self, state_size):
+        #On change juste la dernière couche comparé au CNN Dense
+        #HYPERPARAMETRES
+        Kernel2D_1 = (5,1)
+        Filter2D_1 = 3 # Valeur souvent utilisé pour commencer
+        Kernel2D_2 = (5,1)
+        Filter2D_2 = 20
+        Lstm = 10
+        State = Input(shape=[state_size[2],state_size[1],state_size[0]])
+        last_action = Input(shape=[state_size[0]])
+        last_action_1 = Reshape((1, 1, state_size[0]))(last_action)
+        cash_bias = Input(shape=[1])
+        #Ajout des couches
+        Conv2D_1 = Convolution2D(
+            batch_input_shape=(self.BATCH_SIZE, state_size[2], state_size[1], state_size[0]),  
+            filters=Filter2D_1,
+            kernel_size=Kernel2D_1,     
+            strides=1,
+            padding='valid',              
+            data_format='channels_first',     
+            kernel_regularizer= regularizers.l2(1e-8),
+            activity_regularizer=regularizers.l2(1e-8),
+            bias_regularizer = regularizers.l2(1e-8),
+            activation='relu'
+        )(State)
+        Conv2D_2 = Convolution2D(
+            batch_input_shape= (self.BATCH_SIZE, Filter2D_1, state_size[1]-Kernel2D_1[0]+1, state_size[0]),
+            filters=Filter2D_2,
+            kernel_size=Kernel2D_2,     
+            strides=1,
+            padding='valid',                   
+            data_format='channels_first',      
+            kernel_regularizer= regularizers.l2(1e-8),
+            activity_regularizer= regularizers.l2(1e-8),
+            bias_regularizer = regularizers.l2(1e-8),
+            activation='relu'
+        )(Conv2D_1)
+        L1 = Permute((3,2,1))(Conv2D_2)
+        L2 = TimeDistributed(LSTM(units=Lstm,activation ='tanh',return_sequences = True),input_shape=[state_size[0],-1,Filter2D_2])(L1)
+        L3 = TimeDistributed(LSTM(units=1, activation='linear', return_sequences=False), input_shape=[state_size[0],-1,Lstm)(L2)
+        vote = Flatten()(L3)
+        F1 = concatenate([vote,cash_bias],axis=1)
+        action = Activation('softmax')(F1)
+        return model, model.trainable_weights, State, last_action, cash_bias, vote
     def train(self,states,last_actions,futur_prices,cash_bias):
         self.sess.run(self.optimizer,
         feed_dict={
