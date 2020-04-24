@@ -34,7 +34,7 @@ class Portfolio_managment:
             MODEL_NAME : Nom du résaux de neurones à utiliser (deux disponibles ici : CNN et CNN_LSTM (+ long à compute))
                 type : string
     """
-    def __init__(self, symbols,period_start,period_end,mode,CASH_BIAS = 0,WINDOW_SIZE = 48,LR = 2e-5,MODEL_NAME = 'CNN'):
+    def __init__(self, symbols,period_start,period_end,mode,CASH_BIAS = 0,WINDOW_SIZE = 48,LR = 2e-5,MODEL_NAME = 'CNN',reward = 'avg_log_cum_return'):
         tf.compat.v1.disable_eager_execution() # permet l'utilisation complète de Tensorflow 1
         self.symbols = symbols
         self.period_start = period_start
@@ -65,7 +65,7 @@ class Portfolio_managment:
         self.total_step = 0
         self.session = self.tf_session()
         np.random.seed(4)
-        self.agent = Agent(self.session,self.state_dim,self.action_size,self.BATCH_SIZE,self.LR,'avg_log_cum_return',MODEL_NAME)
+        self.agent = Agent(self.session,self.state_dim,self.action_size,self.BATCH_SIZE,self.LR,reward,MODEL_NAME)
         self.buffer = Buffer(self.BUFFER_SIZE, self.SAMPLE_BIAS)
     def tf_session(self):
         """

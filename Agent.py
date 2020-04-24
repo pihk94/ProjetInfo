@@ -3,6 +3,28 @@ from tensorflow.keras.layers import Input,Convolution2D,Reshape,concatenate,mult
 from tensorflow.keras import regularizers
 from tensorflow.keras.models import Model
 class Agent:
+    """
+        Dans cette objet est défini le réseau de neurone choisit et son fonctionnement avec ses différentes fonctions de reward possible.
+        A noter qu'il était encore difficile pour nous d'implémenter des réseaux de neurones complexes car nous n'avons pas vraiment d'expérience dans ce domaine.
+        De ce fait, deux réseaux sont implémentés, le CNN et le CNN + LSTM. 
+        Le problème est que pour le dernier, le temps d'éxécution moyen est très très long... De ce fait, nous utilisons uniquement le CNN.
+        
+        Input:
+            session :  Session permettant d'utiliser le GPU, tf v1
+                type : tensorflow session method
+            state_size : Tuple de trois dimensions contenant le (nombre de crypto,la taille de la fenetre,le nombre de variable)
+                type : tuple
+            action_size : Nombre d'actions réalisable (nombre de cryptos +1)
+                type : integer
+            BATCH_SIZE : Taille du batch
+                type : integer
+            LR : Learning Rate
+                type :float
+            reward : Function de reward à utiliser pour l'optimisation, doit être une valeur dans ['avg_uniform_constant_rebalanced','SR','calmar_ratio','avg_log_cum_return']
+                type : string
+            NN : Architecture du réseau de neurones à utiliser CNN ou CNN_LSTM (ce dernier est déconseillé vu le temps d'exécution)
+                type : string
+    """
     def __init__(self,session,state_size,action_size,BATCH_SIZE,LR,reward,NN):
         self.sess = session
         self.state_size = state_size
@@ -27,10 +49,18 @@ class Agent:
             print(f'Construction du {NN}')
             self.model,self.weights,self.state,self.last_action,self.cash_bias,self.test = self.CNN_LSTM(state_size)
         else:
-            raise ValueError("Le réseau n'est pas implémenté")
+            raise ValueError("Le réseau n'est pas implémenté.")
         #Choix de la fonction de récompense
         if reward == 'avg_log_cum_return':
             self.reward = self.avg_log_cum_return()
+        elif reward == 'avg_uniform_constant_rebalanced':
+            self.reward = self.avg_uniform_constant_rebalanced()
+        elif reward == 'SR':
+            self.reward = self.SR()
+        elif reward == 'calmar_ratio':
+            self.reward = self.calmar_ratio()
+        else:
+            raise ValueError('Fonction de reward non implémenté.')
         #On prend l'optimiser ADAM qui est le plus souvent utilisé dans la littérature et le plus efficace
         self.optimizer = tf.compat.v1.train.AdamOptimizer(LR).minimize(self.reward,global_step =self.GLOBAL_STEP)
         self.sess.run(tf.compat.v1.global_variables_initializer())
@@ -38,7 +68,28 @@ class Agent:
         print("Reward : Rendements cumulés moyen logarithmique")
         self.cout_transaction = 1 - tf.reduce_sum(self.TRANSITION_FACTOR * tf.abs(self.model.output[:,:-1] - self.last_action), axis=1)
         return -tf.reduce_mean(tf.math.log(self.cout_transaction * tf.reduce_sum(self.model.output * self.futur_price,axis=1)))
+    def avg_uniform_constant_rebalanced(self):
+        print('Reward : avg_uniform_constant_rebalanced')
+        self.cout_transaction = 1 - tf.reduce_sum(self.TRANSITION_FACTOR * tf.abs(self.model.output[:,:-1] - self.last_action), axis=1)
+        return -tf.reduce_mean(tf.math.log(self.cout_transaction * tf.reduce_sum(self.model.output * self.futur_price,axis=1)/tf.reduce_sum(self.futur_price[:,:-1] / self.state_size[0],axis = 1)))
+    def SR(self):
+        print('Reward : Ratio de Sharpe')
+        self.cout_transaction = 1 - tf.reduce_sum(self.TRANSITION_FACTOR * tf.abs(self.model.output[:,:-1] - self.last_action), axis=1)
+        self.avg_return = tf.math.log(self.cout_transaction * tf.reduce_sum(self.model.output * self.futur_price ,axis=1))
+        # On considere notre free risque rate = 0 (grosse simplification)
+        return -(tf.reduce_mean(self.avg_return) * tf.sqrt(tf.compat.v1.to_float(tf.size(self.avg_return)))) / tf.compat.v1.keras.backend.std(self.avg_return)
+    def calmar_ratio(self):
+        print('Reward : Ratio de Calmar')
+        self.cout_transaction = 1 - tf.reduce_sum(self.TRANSITION_FACTOR * tf.abs(self.model.output[:,:-1] - self.last_action), axis=1)
+        self.avg_return = tf.math.log(self.cout_transaction * tf.reduce_sum(self.model.output * self.futur_price ,axis=1))
+        self.cum_return = tf.math.cumprod(self.avg_return)
+        self.max_rolling = tf.scan(lambda a,x : tf.math.maximum(a,x), self.cum_return)
+        self.drawdown = (self.max_rolling - self.cum_return) / self.max_rolling
+        return -(tf.reduce_prod(self.avg_return)-1)/tf.reduce_max(self.drawdown)
     def CNN(self,state_size):
+        """
+            Réseau de neurones à trois couches : 3 convolutions
+        """
         #HYPERPARAMETRES
         Kernel2D_1 = (5,1)
         Filter2D_1 = 3 # Valeur souvent utilisé pour commencer
@@ -145,6 +196,9 @@ class Agent:
         model = Model(inputs=[State, last_action, cash_bias], outputs=action)
         return model, model.trainable_weights, State, last_action, cash_bias, F1
     def CNN_LSTM(self, state_size):
+        """
+            Deux couches de convolutions puis deux de LSTM
+        """
         #On change juste la dernière couche
         #HYPERPARAMETRES
         Kernel2D_1 = (5,1)
@@ -189,6 +243,7 @@ class Agent:
         model = Model(inputs=[State, last_action, cash_bias], outputs=action)
         return model, model.trainable_weights, State, last_action, cash_bias, vote
     def train(self,states,last_actions,futur_prices,cash_bias):
+        # entraine le model
         self.sess.run(self.optimizer,
         feed_dict={
             self.state : states,
